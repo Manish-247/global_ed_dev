@@ -248,6 +248,77 @@ router.get("/emergency_details", auth, async (req, res) => {
   }
 });
 
+router.get("/student/:studentId/profile", auth, async (req, res) => {
+  try {
+    if (!requireFaculty(req, res)) return;
+
+    const studentId = Number(req.params.studentId);
+    if (!Number.isFinite(studentId)) {
+      return res.status(400).json({ message: "Invalid studentId" });
+    }
+
+    const [accessRows] = await pool.execute(
+      `SELECT s.id
+       FROM students s
+       INNER JOIN student_programs sp ON sp.student_id = s.id
+       INNER JOIN faculty_programs fp ON fp.program_id = sp.program_id
+       WHERE s.id = ? AND fp.faculty_id = ? AND s.is_deleted = 0
+       LIMIT 1`,
+      [studentId, req.user.id],
+    );
+
+    if (!accessRows.length) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    const [rows] = await pool.execute(
+      `SELECT
+        s.id,
+        s.first_name,
+        s.last_name,
+        s.profile_image_url,
+        s.primary_email,
+        s.secondary_email,
+        s.phone_number,
+        s.linkedin_url,
+        s.allergies,
+        s.medication,
+        s.other_needs,
+        s.blood_type,
+        s.housing_id,
+        p.program_title,
+        p.banner_image_url,
+        h.housing_name,
+        h.id AS housing_unit_id,
+        h.google_map_url AS housing_location_url,
+        h.profile_image_url AS housing_image,
+        c.company_name,
+        c.id AS company_id,
+        c.google_map_url AS company_location_url,
+        c.logo_url AS company_logo_url,
+        hsti.host_institution_name,
+        hsti.profile_image_url AS academics_image,
+        hsti.google_map_url AS academics_location_url
+       FROM students s
+       LEFT JOIN programs p ON s.program_lookup_id = p.zoho_id
+       LEFT JOIN host_institutions hsti ON hsti.zoho_id = p.host_institution_id
+       LEFT JOIN housing_units h ON s.housing_placement_id = h.zoho_id
+       LEFT JOIN companies c ON s.companies_id = c.zoho_id
+       WHERE s.id = ?`,
+      [studentId],
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 router.get("/participants", auth, async (req, res) => {
   try {
     if (!requireFaculty(req, res)) return;
