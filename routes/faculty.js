@@ -21,7 +21,7 @@ router.get("/profile", auth, async (req, res) => {
         f.first_name,
         f.last_name,
         f.profile_image_url,
-        f.primary_email,
+        f.email,
         f.secondary_email,
         f.phone_number,
         f.linkedin_url,
