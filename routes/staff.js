@@ -439,4 +439,53 @@ router.get("/events", auth, async (req, res) => {
   }
 });
 
+router.get("/events/:eventId/attendance", auth, async (req, res) => {
+  try {
+    if (req.user.role !== "staff") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const eventId = Number(req.params.eventId);
+    if (!Number.isFinite(eventId)) {
+      return res.status(400).json({ message: "Invalid eventId" });
+    }
+
+    const [accessRows] = await pool.execute(
+      `SELECT pe.id
+       FROM program_events pe
+       INNER JOIN programs p ON p.id = pe.program_id
+       INNER JOIN staff_locations sl ON sl.location_id = p.location_id
+       WHERE pe.id = ? AND sl.staff_id = ? AND pe.is_deleted = 0
+       LIMIT 1`,
+      [eventId, req.user.id],
+    );
+
+    if (!accessRows.length) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+
+    const [rows] = await pool.execute(
+      `SELECT
+        s.id AS student_id,
+        s.zoho_id AS student_zoho_id,
+        s.first_name,
+        s.last_name,
+        s.primary_email,
+        s.phone_number,
+        s.profile_image_url
+       FROM students s
+       INNER JOIN student_programs sp ON sp.student_id = s.id
+       INNER JOIN program_events pe ON pe.program_id = sp.program_id
+       WHERE pe.id = ? AND s.is_deleted = 0
+       ORDER BY s.first_name ASC, s.last_name ASC`,
+      [eventId],
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 module.exports = router;
