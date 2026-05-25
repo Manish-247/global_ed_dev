@@ -39,8 +39,8 @@ router.get("/profile", auth, async (req, res) => {
         loc.city,
         loc.country
        FROM faculty f
-       INNER JOIN faculty_programs fp ON fp.faculty_id = f.id
-       INNER JOIN programs p ON p.id = fp.program_id
+       LEFT JOIN faculty_programs fp ON fp.faculty_id = f.id
+       LEFT JOIN programs p ON p.id = fp.program_id
        LEFT JOIN housing_units h ON h.id = f.housing_id
        LEFT JOIN locations loc ON loc.id = p.location_id
        WHERE f.id = ?`,
