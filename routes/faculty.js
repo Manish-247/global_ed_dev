@@ -248,6 +248,38 @@ router.get("/emergency_details", auth, async (req, res) => {
   }
 });
 
+router.get("/participants", auth, async (req, res) => {
+  try {
+    if (!requireFaculty(req, res)) return;
+
+    const [rows] = await pool.execute(
+      `SELECT DISTINCT
+        s.id AS student_id,
+        s.zoho_id AS student_zoho_id,
+        s.first_name,
+        s.last_name,
+        s.primary_email,
+        s.phone_number,
+        s.profile_image_url
+       FROM students s
+       INNER JOIN student_programs sp ON sp.student_id = s.id
+       INNER JOIN faculty_programs fp ON fp.program_id = sp.program_id
+       WHERE fp.faculty_id = ? AND s.is_deleted = 0
+       ORDER BY s.first_name ASC, s.last_name ASC`,
+      [req.user.id],
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ message: "No students found" });
+    }
+
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 router.get("/events/:eventId/attendance", auth, async (req, res) => {
   try {
     if (!requireFaculty(req, res)) return;
