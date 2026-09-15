@@ -3,6 +3,7 @@ const pool = require("../db");
 const auth = require("../middleware/auth");
 
 const router = express.Router();
+router.use("/check-in-requests", require("./check-ins")("student", pool));
 
 /**
  * GET /api/student/profile
