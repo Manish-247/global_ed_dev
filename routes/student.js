@@ -322,6 +322,7 @@ router.get("/events", selectProgram(pool), async (req, res) => {
       pe.status,
       pe.weekday,
       pe.staff_id,
+      assigned_staff.name AS staff_name,
       pe.staff_comments,
       pe.additional_comments,
       pe.approx_duration_minutes 
@@ -332,6 +333,8 @@ router.get("/events", selectProgram(pool), async (req, res) => {
        ON e.event_type_id = et.id
 
       INNER JOIN meeting_points mp ON pe.meeting_point_id = mp.id
+
+      LEFT JOIN staff assigned_staff ON assigned_staff.id = pe.staff_id
 
       INNER JOIN programs p ON p.id = pe.program_id
       

@@ -94,3 +94,20 @@ test("health is restricted to the logged-in student", async () => {
   const result = await request("/health?student_id=999", [{ match: /WHERE s.id = \?/, params: [7], rows: [{ allergies: null }] }]);
   assert.equal(result.status, 200);
 });
+
+
+test("event staff names come from the assigned staff record without filtering out unassigned events", async () => {
+  const events = [
+    { id: 41, staff_id: 12, staff_name: "Steven", staff_comments: null, additional_comments: null },
+    { id: 42, staff_id: null, staff_name: null },
+  ];
+  const result = await request("/events?program_id=3", [
+    { params: [7, 3], rows: [{ program_id: 3 }] },
+    {
+      match: /assigned_staff.name AS staff_name[\s\S]*LEFT JOIN staff assigned_staff ON assigned_staff.id = pe.staff_id[\s\S]*WHERE p.id = \?/,
+      params: [3], rows: events,
+    },
+  ]);
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.data, events);
+});
