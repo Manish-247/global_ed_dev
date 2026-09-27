@@ -53,6 +53,12 @@ The following endpoints now require `?program_id=<selectedProgramId>`:
 
 Example: `GET /api/student/events?program_id=12`.
 
+Each event also includes `staff_id` (number or null), `staff_comments` (string or
+null), and `additional_comments` (string or null) from `program_events`. Pass
+these fields to the single-event screen's information section and hide empty
+comment fields. Use `id` to identify the program event; `event_id` identifies the
+underlying event template.
+
 Existing response shapes remain: staff/events/points of interest return arrays;
 the other detail endpoints return objects. Program details also include the
 selector fields above. Profile includes `program_id` and the selected title.
