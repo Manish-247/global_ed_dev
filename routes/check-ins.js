@@ -11,8 +11,8 @@ const fields = `r.id, r.program_id, r.created_by_faculty_id, r.check_in_type,
   f.first_name AS faculty_first_name, f.last_name AS faculty_last_name`;
 const facultyAccess = `EXISTS (SELECT 1 FROM faculty_programs fp
   WHERE fp.program_id = r.program_id AND fp.faculty_id = ?)`;
-const studentAccess = `EXISTS (SELECT 1 FROM student_programs sp
-  WHERE sp.program_id = r.program_id AND sp.student_id = ?)`;
+const studentAccess = `EXISTS (SELECT 1 FROM program_student_relations sp
+  WHERE sp.program_id = r.program_id AND sp.student_id = ? AND sp.is_deleted = 0)`;
 const summary = `SELECT check_in_request_id, COUNT(*) AS total,
   SUM(response_status = 'confirmed') AS confirmed,
   SUM(response_status = 'not_confirmed') AS not_confirmed,
@@ -106,8 +106,8 @@ module.exports = function checkIns(role, pool) {
           VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP(), TIMESTAMPADD(MINUTE, ?, UTC_TIMESTAMP()))`,
         [programId, req.user.id, type, message, gps, duration]);
         const [recipients] = await connection.execute(`INSERT INTO check_in_responses (check_in_request_id, student_id, created_at)
-          SELECT ?, sp.student_id, UTC_TIMESTAMP() FROM student_programs sp
-          INNER JOIN students s ON s.id = sp.student_id AND s.is_deleted = 0 WHERE sp.program_id = ?`, [insert.insertId, programId]);
+          SELECT DISTINCT ?, sp.student_id, UTC_TIMESTAMP() FROM program_student_relations sp
+          INNER JOIN students s ON s.id = sp.student_id AND sp.is_deleted = 0 AND s.is_deleted = 0 WHERE sp.program_id = ?`, [insert.insertId, programId]);
         const [rows] = await connection.execute("SELECT id, program_id, check_in_type, message, request_gps_location, status, DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%sZ') AS created_at, DATE_FORMAT(expires_at, '%Y-%m-%dT%H:%i:%sZ') AS expires_at FROM check_in_requests WHERE id = ?", [insert.insertId]);
         return { ...rows[0], total: recipients.affectedRows, confirmed: 0, not_confirmed: 0, no_response: recipients.affectedRows };
       });

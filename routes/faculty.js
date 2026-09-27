@@ -261,7 +261,7 @@ router.get("/student/:studentId/profile", auth, async (req, res) => {
     const [accessRows] = await pool.execute(
       `SELECT s.id
        FROM students s
-       INNER JOIN student_programs sp ON sp.student_id = s.id
+       INNER JOIN program_student_relations sp ON sp.student_id = s.id AND sp.is_deleted = 0
        INNER JOIN faculty_programs fp ON fp.program_id = sp.program_id
        WHERE s.id = ? AND fp.faculty_id = ? AND s.is_deleted = 0
        LIMIT 1`,
@@ -334,7 +334,7 @@ router.get("/participants", auth, async (req, res) => {
         s.phone_number,
         s.profile_image_url
        FROM students s
-       INNER JOIN student_programs sp ON sp.student_id = s.id
+       INNER JOIN program_student_relations sp ON sp.student_id = s.id AND sp.is_deleted = 0
        INNER JOIN faculty_programs fp ON fp.program_id = sp.program_id
        WHERE fp.faculty_id = ? AND s.is_deleted = 0
        ORDER BY s.first_name ASC, s.last_name ASC`,
@@ -376,7 +376,7 @@ router.get("/events/:eventId/attendance", auth, async (req, res) => {
     }
 
     const [rows] = await pool.execute(
-      `SELECT
+      `SELECT DISTINCT
         s.id AS student_id,
         s.zoho_id AS student_zoho_id,
         s.first_name,
@@ -385,7 +385,7 @@ router.get("/events/:eventId/attendance", auth, async (req, res) => {
         s.phone_number,
         s.profile_image_url
        FROM students s
-       INNER JOIN student_programs sp ON sp.student_id = s.id
+       INNER JOIN program_student_relations sp ON sp.student_id = s.id AND sp.is_deleted = 0
        INNER JOIN program_events pe ON pe.program_id = sp.program_id
        WHERE pe.id = ? AND s.is_deleted = 0
        ORDER BY s.first_name ASC, s.last_name ASC`,

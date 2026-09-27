@@ -3,17 +3,36 @@ const pool = require("../db");
 const auth = require("../middleware/auth");
 
 const router = express.Router();
+const { selectProgram, programSummary } = require("../lib/student-programs");
+
+router.use(auth, (req, res, next) => {
+  if (req.user.role !== "student") return res.status(403).json({ message: "Forbidden" });
+  next();
+});
+
+router.get("/programs", async (req, res) => {
+  try {
+    const [rows] = await pool.execute(`${programSummary}
+      WHERE psr.student_id = ? AND psr.is_deleted = 0 AND p.is_deleted = 0
+        AND s.is_deleted = 0
+      ORDER BY p.arrival_date DESC, p.id DESC, psr.id DESC`, [req.user.id]);
+    // A CRM sync can contain more than one relation for the same program.
+    res.json(rows.filter((row, index) => rows.findIndex(other => other.program_id === row.program_id) === index));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 router.use("/check-in-requests", require("./check-ins")("student", pool));
 
 /**
  * GET /api/student/profile
  */
-router.get("/profile", auth, async (req, res) => {
+router.get("/profile", selectProgram(pool), async (req, res) => {
   try {
     if (req.user.role !== "student") {
       return res.status(403).json({ message: "Forbidden" });
     }
-    //console.log(req.user.id);
     const [rows] = await pool.execute(
       `SELECT 
         s.id,
@@ -28,7 +47,7 @@ router.get("/profile", auth, async (req, res) => {
         s.medication,
         s.other_needs,
         s.blood_type,
-        s.housing_id,
+        p.id AS program_id,
         p.program_title,
         p.banner_image_url,
         h.housing_name,
@@ -43,18 +62,18 @@ router.get("/profile", auth, async (req, res) => {
         hsti.profile_image_url as academics_image,
         hsti.google_map_url as academics_location_url 
        FROM students s
-       INNER JOIN programs p on s.program_lookup_id = p.zoho_id AND s.id = ?
+       INNER JOIN programs p ON p.id = ? AND s.id = ?
        LEFT JOIN host_institutions hsti on hsti.zoho_id = p.host_institution_id
-       LEFT JOIN housing_units h on s.housing_placement_id = h.zoho_id
-       LEFT JOIN companies c on s.companies_id = c.zoho_id`,
-      [req.user.id],
+       LEFT JOIN housing_units h ON s.housing_placement_id = h.zoho_id AND s.program_lookup_id = p.zoho_id AND h.is_deleted = 0
+       LEFT JOIN companies c ON s.companies_id = c.zoho_id AND s.program_lookup_id = p.zoho_id AND c.is_deleted = 0`,
+      [req.program.program_id, req.user.id],
     );
 
     if (!rows.length) {
       return res.status(404).json({ message: "Student not found" });
     }
 
-    res.json(rows[0]);
+    res.json({ ...rows[0], program_title: req.program.program_title });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
@@ -93,7 +112,7 @@ router.get("/documents", auth, async (req, res) => {
   }
 });
 
-router.get("/program", auth, async (req, res) => {
+router.get("/program", selectProgram(pool), async (req, res) => {
   try {
     if (req.user.role !== "student") {
       return res.status(403).json({ message: "Forbidden" });
@@ -113,7 +132,6 @@ router.get("/program", auth, async (req, res) => {
         prog.program_description as program_description,
         prog.program_status as program_status,
         prog.year as year,
-        prog.year as year,
         prog.image_gallery_url,
         loc.id as location_id,
         loc.location_name as location_name,
@@ -126,26 +144,23 @@ router.get("/program", auth, async (req, res) => {
         loc.currency as location_currency,
         loc.salutation as location_salutation 
        FROM programs prog
-       INNER JOIN student_programs sprog
-       ON prog.id = sprog.program_id AND sprog.student_id = ?
-       
-       INNER JOIN locations loc ON
-       prog.location_id = loc.id`,
-      [req.user.id],
+       LEFT JOIN locations loc ON prog.location_id = loc.id
+       WHERE prog.id = ?`,
+      [req.program.program_id],
     );
 
     if (!rows.length) {
       return res.status(404).json({ message: "No record found." });
     }
 
-    res.json(rows[0]);
+    res.json({ ...rows[0], ...req.program });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-router.get("/academics", auth, async (req, res) => {
+router.get("/academics", selectProgram(pool), async (req, res) => {
   try {
     if (req.user.role !== "student") {
       return res.status(403).json({ message: "Forbidden" });
@@ -158,9 +173,8 @@ router.get("/academics", auth, async (req, res) => {
        INNER JOIN programs prog ON
        prog.host_institution_id = acad.zoho_id
 
-      INNER JOIN student_programs sprog
-       ON prog.id = sprog.program_id AND sprog.student_id = ?`,
-      [req.user.id],
+      WHERE prog.id = ?`,
+      [req.program.program_id],
     );
 
     if (!rows.length) {
@@ -174,7 +188,7 @@ router.get("/academics", auth, async (req, res) => {
   }
 });
 
-router.get("/staff", auth, async (req, res) => {
+router.get("/staff", selectProgram(pool), async (req, res) => {
   try {
     if (req.user.role !== "student") {
       return res.status(403).json({ message: "Forbidden" });
@@ -191,11 +205,8 @@ router.get("/staff", auth, async (req, res) => {
        INNER JOIN programs prog ON
        prog.location_id = staff_loc.location_id
 
-       INNER JOIN student_programs sprog
-       ON prog.id = sprog.program_id
-       
-       WHERE sprog.student_id = ?`,
-      [req.user.id],
+       WHERE prog.id = ?`,
+      [req.program.program_id],
     );
 
     if (!rows.length) {
@@ -209,7 +220,7 @@ router.get("/staff", auth, async (req, res) => {
   }
 });
 
-router.get("/housing", auth, async (req, res) => {
+router.get("/housing", selectProgram(pool), async (req, res) => {
   try {
     if (req.user.role !== "student") {
       return res.status(403).json({ message: "Forbidden" });
@@ -220,18 +231,12 @@ router.get("/housing", auth, async (req, res) => {
       n.neighborhood_name,
       n.description as neighborhood_description
       FROM housing_units h
-      INNER JOIN neighborhoods n ON h.neighborhood_id = n.id
+      LEFT JOIN neighborhoods n ON h.neighborhood_id = n.id
       INNER JOIN students s
-       ON h.is_deleted = 0 AND s.housing_placement_id = h.zoho_id AND s.id = ?`,
-      [req.user.id],
+       ON h.is_deleted = 0 AND s.housing_placement_id = h.zoho_id AND s.id = ?
+      INNER JOIN programs p ON p.zoho_id = s.program_lookup_id AND p.id = ?`,
+      [req.user.id, req.program.program_id],
     );
-
-    /*`SELECT
-      h.*,
-      FROM housing_units h
-
-       INNER JOIN students s
-       ON s.housing_id = h.id AND s.id =  ?`*/
 
     if (!rows.length) {
       return res.status(404).json({ message: "Student not found" });
@@ -244,7 +249,7 @@ router.get("/housing", auth, async (req, res) => {
   }
 });
 
-router.get("/internship", auth, async (req, res) => {
+router.get("/internship", selectProgram(pool), async (req, res) => {
   try {
     if (req.user.role !== "student") {
       return res.status(403).json({ message: "Forbidden" });
@@ -253,8 +258,9 @@ router.get("/internship", auth, async (req, res) => {
       `SELECT 
         c.* from companies c
         INNER JOIN students s
-       ON c.zoho_id = s.companies_id AND s.id = ?`,
-      [req.user.id],
+       ON c.zoho_id = s.companies_id AND s.id = ? AND c.is_deleted = 0
+       INNER JOIN programs p ON p.zoho_id = s.program_lookup_id AND p.id = ?`,
+      [req.user.id, req.program.program_id],
     );
 
     if (!rows.length) {
@@ -275,7 +281,7 @@ router.get("/health", auth, async (req, res) => {
     }
     const [rows] = await pool.execute(
       `SELECT allergies, medication, additional_health_information, health_insurance_letter from students s
-        WHERE s.id`,
+        WHERE s.id = ?`,
       [req.user.id],
     );
 
@@ -290,12 +296,11 @@ router.get("/health", auth, async (req, res) => {
   }
 });
 
-router.get("/events", auth, async (req, res) => {
+router.get("/events", selectProgram(pool), async (req, res) => {
   try {
     if (req.user.role !== "student") {
       return res.status(403).json({ message: "Forbidden" });
     }
-    console.log(req.user.id);
     const [rows] = await pool.execute(
       `SELECT
       pe.id,
@@ -327,10 +332,8 @@ router.get("/events", auth, async (req, res) => {
 
       INNER JOIN programs p ON p.id = pe.program_id
       
-      INNER JOIN student_programs sp on sp.program_id = pe.program_id
-
-      INNER JOIN students s on sp.student_id = s.id AND s.id = ?`,
-      [req.user.id],
+      WHERE p.id = ?`,
+      [req.program.program_id],
     );
 
     if (!rows.length) {
@@ -344,7 +347,7 @@ router.get("/events", auth, async (req, res) => {
   }
 });
 
-router.get("/point_of_interests", auth, async (req, res) => {
+router.get("/point_of_interests", selectProgram(pool), async (req, res) => {
   try {
     const [rows] = await pool.execute(
       `SELECT
@@ -352,8 +355,8 @@ router.get("/point_of_interests", auth, async (req, res) => {
         poi.* from points_of_interest poi
         INNER JOIN poi_categories poic ON poi.poi_category_id = poic.id
         INNER JOIN programs p on p.location_id = poi.location_id
-        INNER JOIN students s on s.program_lookup_id = p.zoho_id AND s.id = ?`,
-      [req.user.id],
+        WHERE p.id = ?`,
+      [req.program.program_id],
     );
 
     if (!rows.length) {

@@ -62,7 +62,7 @@ Returns HTTP 200 with the saved response and submission timestamp. A student can
 
 - JWT authentication, matching role and a non-deleted account are required.
 - Faculty can create/view requests only for programs in `faculty_programs`, including requests created by other faculty in the same program.
-- Students must have both a recipient row and current membership in `student_programs` to view/respond.
+- Students must have both a recipient row and non-deleted membership in `program_student_relations` to view/respond.
 - Recipients are a snapshot of non-deleted students enrolled when the request is created. Later enrollments do not receive old requests; summary counts retain the original recipients.
 - Request and student identities cannot be overridden through the body. SQL uses bound values and validated pagination.
 - HTTP 400: invalid input; 401: missing/invalid token; 403: wrong role/deleted account; 404: missing or inaccessible resource; 409: duplicate response or inactive request; 500: generic server error.

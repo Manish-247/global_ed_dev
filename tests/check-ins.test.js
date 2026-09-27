@@ -58,7 +58,7 @@ test("creates request and all pending recipients atomically", async () => {
   const result = await request("faculty", "POST", "/", { ...create, student_id: 999, created_by_faculty_id: 999 }, [
     { result: [{ program_id: 2 }] },
     { match: /INSERT INTO check_in_requests/, check: p => { assert.equal(p[1], 7); assert.equal(p[5], 1440); }, result: { insertId: 42 } },
-    { match: /INSERT INTO check_in_responses[\s\S]*student_programs[\s\S]*is_deleted = 0/, result: { affectedRows: 3 } },
+    { match: /INSERT INTO check_in_responses[\s\S]*program_student_relations[\s\S]*is_deleted = 0/, result: { affectedRows: 3 } },
     { result: [{ id: 42 }] },
   ]);
   assert.equal(result.status, 201);
@@ -75,10 +75,18 @@ test("recipient creation failure rolls back request", async () => {
 });
 test("student dashboard returns only own program requests", async () => {
   const result = await request("student", "GET", "/?response_status=pending", undefined, [
-    { match: /own.student_id = \?[\s\S]*student_programs[\s\S]*expires_at > UTC_TIMESTAMP/, check: p => assert.deepEqual(p, [7, 7, "pending"]), result: [{ id: 42, response_status: "pending" }] },
+    { match: /own.student_id = \?[\s\S]*program_student_relations[\s\S]*expires_at > UTC_TIMESTAMP/, check: p => assert.deepEqual(p, [7, 7, "pending"]), result: [{ id: 42, response_status: "pending" }] },
   ]);
   assert.equal(result.status, 200);
   assert.equal(result.data.items.length, 1);
+});
+test("student check-ins honor the dropdown selection and non-deleted membership", async () => {
+  const result = await request("student", "GET", "/?program_id=3", undefined, [
+    { match: /program_student_relations[\s\S]*sp.is_deleted = 0[\s\S]*r.program_id = \?/,
+      check: p => assert.deepEqual(p, [7, 7, 3]), result: [] },
+  ]);
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.data.items, []);
 });
 test("faculty history includes counts and expiration filter", async () => {
   const result = await request("faculty", "GET", "/?status=past", undefined, [{ match: /AS no_response[\s\S]*faculty_programs[\s\S]*NOT \(r.status/, result: [] }]);
@@ -105,7 +113,7 @@ test("validates response and coordinate pair", async () => {
   }
 });
 test("prevents cross-program submissions", async () => {
-  const result = await request("student", "POST", "/42/response", { response_status: "confirmed" }, [{ match: /student_programs[\s\S]*FOR UPDATE/, result: [] }]);
+  const result = await request("student", "POST", "/42/response", { response_status: "confirmed" }, [{ match: /program_student_relations[\s\S]*FOR UPDATE/, result: [] }]);
   assert.equal(result.status, 404);
 });
 test("rejects expired requests and repeat submissions", async () => {
