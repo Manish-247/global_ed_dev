@@ -111,3 +111,18 @@ test("event staff names come from the assigned staff record without filtering ou
   assert.equal(result.status, 200);
   assert.deepEqual(result.data, events);
 });
+
+
+test("program details expose language school configuration only for the selected enrollment", async () => {
+  for (const school of [
+    { language_school_id: 5, language_school_zoho_id: "354943300004890003", language_school_name: "Example Language School", language_class_start_date: "2027-01-10", language_class_end_date: "2027-02-10", language_class_weeks_included: "4", additional_language_class_weeks_allowed: "None", language_course_enrollment: "Included" },
+    { language_school_id: null, language_school_zoho_id: null, language_school_name: null, language_class_start_date: null, language_class_end_date: null, language_class_weeks_included: "1", additional_language_class_weeks_allowed: "None", language_course_enrollment: null },
+  ]) {
+    const result = await request("/program?program_id=3", [
+      { params: [7, 3], rows: [{ program_id: 3 }] },
+      { match: /prog.language_school_id,[\s\S]*prog.language_school_zoho_id,[\s\S]*prog.language_school_name,[\s\S]*DATE_FORMAT\(prog.language_class_start_date,[\s\S]*prog.additional_language_class_weeks_allowed,[\s\S]*prog.language_course_enrollment,[\s\S]*WHERE prog.id = \?/, params: [3], rows: [{ program_id: 3, ...school }] },
+    ]);
+    assert.equal(result.status, 200);
+    assert.deepEqual(result.data, { program_id: 3, ...school });
+  }
+});

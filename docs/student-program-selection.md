@@ -109,3 +109,14 @@ Restart the API process after changing environment values, and update any hosted
 environment configuration separately. Deploy the backend and mobile changes
 together: older clients that omit program_id on scoped screens receive `400`.
 No database data or schema was modified by this change.
+
+
+## Language school
+
+`GET /api/student/program?program_id=<id>` includes `language_school_id`,
+`language_school_zoho_id` (string), `language_school_name`,
+`language_class_start_date`, `language_class_end_date` (YYYY-MM-DD or null),
+`language_class_weeks_included`, `additional_language_class_weeks_allowed`, and
+`language_course_enrollment` from the selected program. Show the Language School
+menu and dedicated screen only when a school ID, Zoho ID, or nonblank school name
+is populated. Dates or week allowances alone do not indicate an assigned school.
