@@ -148,12 +148,18 @@ router.get("/events", auth, async (req, res) => {
         pe.end_datetime,
         pe.status,
         pe.weekday,
+        pe.staff_id,
+        assigned_staff.name AS staff_name,
+        assigned_staff.profile_image_url AS staff_profile_image_url,
+        pe.staff_comments,
+        pe.additional_comments,
         pe.approx_duration_minutes
        FROM program_events pe
        INNER JOIN events e
          ON pe.event_id = e.id AND pe.is_deleted = 0 AND e.is_deleted = 0
        INNER JOIN event_types et ON e.event_type_id = et.id
        INNER JOIN meeting_points mp ON pe.meeting_point_id = mp.id
+       LEFT JOIN staff assigned_staff ON assigned_staff.id = pe.staff_id
        INNER JOIN programs p ON p.id = pe.program_id
        INNER JOIN faculty_programs fp
          ON fp.program_id = pe.program_id AND fp.faculty_id = ?`,

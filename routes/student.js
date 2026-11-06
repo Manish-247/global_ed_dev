@@ -331,6 +331,7 @@ router.get("/events", selectProgram(pool), async (req, res) => {
       pe.weekday,
       pe.staff_id,
       assigned_staff.name AS staff_name,
+      assigned_staff.profile_image_url AS staff_profile_image_url,
       pe.staff_comments,
       pe.additional_comments,
       pe.approx_duration_minutes 

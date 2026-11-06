@@ -414,6 +414,11 @@ router.get("/events", auth, async (req, res) => {
       pe.end_datetime,
       pe.status,
       pe.weekday,
+      pe.staff_id,
+      s.name AS staff_name,
+      s.profile_image_url AS staff_profile_image_url,
+      pe.staff_comments,
+      pe.additional_comments,
       pe.approx_duration_minutes 
       from program_events pe INNER JOIN events e ON
       pe.event_id = e.id AND pe.is_deleted = 0 AND e.is_deleted = 0
