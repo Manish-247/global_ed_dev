@@ -327,6 +327,7 @@ router.get("/events", selectProgram(pool), async (req, res) => {
       pe.event_date,
       pe.start_datetime,
       pe.end_datetime,
+      pe.all_day_event,
       pe.status,
       pe.weekday,
       pe.staff_id,
