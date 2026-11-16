@@ -50,7 +50,7 @@ test("validates request fields before mutation", async () => {
   }
 });
 test("faculty cannot create for another program", async () => {
-  const result = await request("faculty", "POST", "/", create, [{ match: /faculty_programs.*FOR SHARE/, result: [] }]);
+  const result = await request("faculty", "POST", "/", create, [{ match: /program_faculty_relations[\s\S]*FOR SHARE/, result: [] }]);
   assert.equal(result.status, 404);
   assert.ok(result.calls.includes("rollback"));
 });
@@ -89,7 +89,7 @@ test("student check-ins honor the dropdown selection and non-deleted membership"
   assert.deepEqual(result.data.items, []);
 });
 test("faculty history includes counts and expiration filter", async () => {
-  const result = await request("faculty", "GET", "/?status=past", undefined, [{ match: /AS no_response[\s\S]*faculty_programs[\s\S]*NOT \(r.status/, result: [] }]);
+  const result = await request("faculty", "GET", "/?status=past", undefined, [{ match: /AS no_response[\s\S]*program_faculty_relations[\s\S]*NOT \(r.status/, result: [] }]);
   assert.equal(result.status, 200);
 });
 test("inaccessible request detail is hidden", async () => {

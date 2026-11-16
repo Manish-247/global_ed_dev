@@ -7,6 +7,9 @@ let queryCalls=0;
 const rows=[{id:1,program_id:10,staff_id:7},{id:2,program_id:20,staff_id:8},{id:3,program_id:20,staff_id:null}];
 require.cache[require.resolve('../db')]={exports:{execute:async(sql,params)=>{
  queryCalls++;
+ assert.match(sql,/program_faculty_relations/);
+ assert.match(sql,/relation.is_deleted = 0/);
+ assert.doesNotMatch(sql,/faculty_programs/);
  assert.deepEqual(params,[7]);
  assert.match(sql,/p.id AS program_id/);
  assert.match(sql,/LEFT JOIN staff assigned_staff/);

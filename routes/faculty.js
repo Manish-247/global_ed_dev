@@ -1,6 +1,7 @@
 const express = require("express");
 const pool = require("../db");
 const auth = require("../middleware/auth");
+const { activeFacultyPrograms } = require("../lib/faculty-programs");
 
 const router = express.Router();
 router.use("/check-in-requests", require("./check-ins")("faculty", pool));
@@ -40,11 +41,12 @@ router.get("/profile", auth, async (req, res) => {
         loc.city,
         loc.country
        FROM faculty f
-       LEFT JOIN faculty_programs fp ON fp.faculty_id = f.id
+       LEFT JOIN (${activeFacultyPrograms}) fp ON fp.faculty_id = f.id
        LEFT JOIN programs p ON p.id = fp.program_id
        LEFT JOIN housing_units h ON h.id = f.housing_id
        LEFT JOIN locations loc ON loc.id = p.location_id
-       WHERE f.id = ?`,
+       WHERE f.id = ? AND f.is_deleted = 0
+       ORDER BY p.arrival_date DESC, p.id DESC`,
       [req.user.id],
     );
 
@@ -78,9 +80,13 @@ router.get("/documents", auth, async (req, res) => {
   }
 });
 
-router.get("/program", auth, async (req, res) => {
+router.get(["/program", "/programs"], auth, async (req, res) => {
   try {
     if (!requireFaculty(req, res)) return;
+    const programId = req.query.program_id;
+    if (programId !== undefined && (typeof programId !== "string" || !/^[1-9]\d*$/.test(programId) || !Number.isSafeInteger(Number(programId)))) {
+      return res.status(400).json({ message: "Invalid program_id" });
+    }
     const [rows] = await pool.execute(
       `SELECT
         prog.id AS program_id,
@@ -108,11 +114,15 @@ router.get("/program", auth, async (req, res) => {
         loc.currency AS location_currency,
         loc.salutation AS location_salutation
        FROM programs prog
-       INNER JOIN faculty_programs fprog
+       INNER JOIN (${activeFacultyPrograms}) fprog
          ON prog.id = fprog.program_id AND fprog.faculty_id = ?
-       INNER JOIN locations loc ON prog.location_id = loc.id`,
-      [req.user.id],
+       LEFT JOIN locations loc ON prog.location_id = loc.id
+       ${programId === undefined ? "" : "WHERE prog.id = ?"}
+       ORDER BY prog.arrival_date DESC, prog.id DESC`,
+      programId === undefined ? [req.user.id] : [req.user.id, Number(programId)],
     );
+
+    if (req.path === "/programs") return res.json(rows);
 
     if (!rows.length) {
       return res.status(404).json({ message: "No record found." });
@@ -164,7 +174,7 @@ router.get("/events", auth, async (req, res) => {
        LEFT JOIN meeting_points mp ON pe.meeting_point_id = mp.id
        LEFT JOIN staff assigned_staff ON assigned_staff.id = pe.staff_id
        INNER JOIN programs p ON p.id = pe.program_id AND p.is_deleted = 0
-       WHERE EXISTS (SELECT 1 FROM faculty_programs fp
+       WHERE EXISTS (SELECT 1 FROM (${activeFacultyPrograms}) fp
          WHERE fp.program_id = pe.program_id AND fp.faculty_id = ?)
        ORDER BY pe.start_datetime, pe.id`,
       [req.user.id],
@@ -217,7 +227,7 @@ router.get("/point_of_interests", auth, async (req, res) => {
        FROM points_of_interest poi
        INNER JOIN poi_categories poic ON poi.poi_category_id = poic.id
        INNER JOIN programs p ON p.location_id = poi.location_id
-       INNER JOIN faculty_programs fp
+       INNER JOIN (${activeFacultyPrograms}) fp
          ON fp.program_id = p.id AND fp.faculty_id = ?`,
       [req.user.id],
     );
@@ -272,7 +282,7 @@ router.get("/student/:studentId/profile", auth, async (req, res) => {
       `SELECT s.id
        FROM students s
        INNER JOIN program_student_relations sp ON sp.student_id = s.id AND sp.is_deleted = 0
-       INNER JOIN faculty_programs fp ON fp.program_id = sp.program_id
+       INNER JOIN (${activeFacultyPrograms}) fp ON fp.program_id = sp.program_id
        WHERE s.id = ? AND fp.faculty_id = ? AND s.is_deleted = 0
        LIMIT 1`,
       [studentId, req.user.id],
@@ -345,7 +355,7 @@ router.get("/participants", auth, async (req, res) => {
         s.profile_image_url
        FROM students s
        INNER JOIN program_student_relations sp ON sp.student_id = s.id AND sp.is_deleted = 0
-       INNER JOIN faculty_programs fp ON fp.program_id = sp.program_id
+       INNER JOIN (${activeFacultyPrograms}) fp ON fp.program_id = sp.program_id
        WHERE fp.faculty_id = ? AND s.is_deleted = 0
        ORDER BY s.first_name ASC, s.last_name ASC`,
       [req.user.id],
@@ -374,7 +384,7 @@ router.get("/events/:eventId/attendance", auth, async (req, res) => {
     const [accessRows] = await pool.execute(
       `SELECT pe.id
        FROM program_events pe
-       INNER JOIN faculty_programs fp
+       INNER JOIN (${activeFacultyPrograms}) fp
          ON fp.program_id = pe.program_id AND fp.faculty_id = ?
        WHERE pe.id = ? AND pe.is_deleted = 0
        LIMIT 1`,

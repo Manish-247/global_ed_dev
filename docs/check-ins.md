@@ -61,7 +61,7 @@ Returns HTTP 200 with the saved response and submission timestamp. A student can
 ## Access and delivery
 
 - JWT authentication, matching role and a non-deleted account are required.
-- Faculty can create/view requests only for programs in `faculty_programs`, including requests created by other faculty in the same program.
+- Faculty can create/view requests only for programs in `program_faculty_relations`, including requests created by other faculty in the same program.
 - Students must have both a recipient row and non-deleted membership in `program_student_relations` to view/respond.
 - Recipients are a snapshot of non-deleted students enrolled when the request is created. Later enrollments do not receive old requests; summary counts retain the original recipients.
 - Request and student identities cannot be overridden through the body. SQL uses bound values and validated pagination.

@@ -1,5 +1,6 @@
 const express = require("express");
 const auth = require("../middleware/auth");
+const { activeFacultyPrograms } = require("../lib/faculty-programs");
 
 const active = "r.status = 'active' AND r.expires_at > UTC_TIMESTAMP()";
 const fields = `r.id, r.program_id, r.created_by_faculty_id, r.check_in_type,
@@ -9,7 +10,7 @@ const fields = `r.id, r.program_id, r.created_by_faculty_id, r.check_in_type,
   CASE WHEN r.status = 'active' AND r.expires_at <= UTC_TIMESTAMP()
     THEN 'expired' ELSE r.status END AS status,
   f.first_name AS faculty_first_name, f.last_name AS faculty_last_name`;
-const facultyAccess = `EXISTS (SELECT 1 FROM faculty_programs fp
+const facultyAccess = `EXISTS (SELECT 1 FROM (${activeFacultyPrograms}) fp
   WHERE fp.program_id = r.program_id AND fp.faculty_id = ?)`;
 const studentAccess = `EXISTS (SELECT 1 FROM program_student_relations sp
   WHERE sp.program_id = r.program_id AND sp.student_id = ? AND sp.is_deleted = 0)`;
@@ -99,7 +100,10 @@ module.exports = function checkIns(role, pool) {
       const duration = days * 1440 + hours * 60 + minutes;
       if (duration < 1 || duration > 43200) fail(400, "Expiration must be between 1 minute and 30 days");
       const result = await transaction(pool, async connection => {
-        const [access] = await connection.execute("SELECT program_id FROM faculty_programs WHERE faculty_id = ? AND program_id = ? FOR SHARE", [req.user.id, programId]);
+        const [access] = await connection.execute(`SELECT relation.program_id FROM program_faculty_relations relation
+          INNER JOIN programs p ON p.id = relation.program_id AND p.is_deleted = 0
+          INNER JOIN faculty f ON f.id = relation.faculty_id AND f.is_deleted = 0
+          WHERE relation.faculty_id = ? AND relation.program_id = ? AND relation.is_deleted = 0 FOR SHARE`, [req.user.id, programId]);
         if (!access.length) fail(404, "Program not found");
         const [insert] = await connection.execute(`INSERT INTO check_in_requests
           (program_id, created_by_faculty_id, check_in_type, message, request_gps_location, created_at, expires_at)
