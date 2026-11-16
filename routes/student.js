@@ -304,7 +304,10 @@ router.get("/health", auth, async (req, res) => {
   }
 });
 
-router.get("/events", selectProgram(pool), async (req, res) => {
+router.get(["/events", "/calendar-events"], (req, res, next) => {
+  if (req.path === "/calendar-events") return next();
+  return selectProgram(pool)(req, res, next);
+}, async (req, res) => {
   try {
     if (req.user.role !== "student") {
       return res.status(403).json({ message: "Forbidden" });
@@ -323,6 +326,7 @@ router.get("/events", selectProgram(pool), async (req, res) => {
       mp.meeting_point_url,
       mp.meeting_point_address,
       mp.meeting_point_description,
+      p.id AS program_id,
       p.program_code,
       pe.event_date,
       pe.start_datetime,
@@ -339,17 +343,22 @@ router.get("/events", selectProgram(pool), async (req, res) => {
       from program_events pe INNER JOIN events e ON
       pe.event_id = e.id AND pe.is_deleted = 0 AND e.is_deleted = 0
       
-      INNER JOIN event_types et
+      LEFT JOIN event_types et
        ON e.event_type_id = et.id
 
-      INNER JOIN meeting_points mp ON pe.meeting_point_id = mp.id
+      LEFT JOIN meeting_points mp ON pe.meeting_point_id = mp.id
 
       LEFT JOIN staff assigned_staff ON assigned_staff.id = pe.staff_id
 
-      INNER JOIN programs p ON p.id = pe.program_id
+      INNER JOIN programs p ON p.id = pe.program_id AND p.is_deleted = 0
       
-      WHERE p.id = ?`,
-      [req.program.program_id],
+      WHERE ${req.path === "/calendar-events" ? `EXISTS (
+        SELECT 1 FROM program_student_relations psr
+        INNER JOIN students student ON student.id = psr.student_id AND student.is_deleted = 0
+        WHERE psr.program_id = p.id AND psr.student_id = ? AND psr.is_deleted = 0
+      )` : "p.id = ?"}
+      ORDER BY pe.start_datetime, pe.id`,
+      [req.path === "/calendar-events" ? req.user.id : req.program.program_id],
     );
 
     if (!rows.length) {

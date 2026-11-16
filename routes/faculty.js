@@ -142,6 +142,7 @@ router.get("/events", auth, async (req, res) => {
         mp.meeting_point_url,
         mp.meeting_point_address,
         mp.meeting_point_description,
+        p.id AS program_id,
         p.program_code,
         pe.event_date,
         pe.start_datetime,
@@ -158,12 +159,13 @@ router.get("/events", auth, async (req, res) => {
        FROM program_events pe
        INNER JOIN events e
          ON pe.event_id = e.id AND pe.is_deleted = 0 AND e.is_deleted = 0
-       INNER JOIN event_types et ON e.event_type_id = et.id
-       INNER JOIN meeting_points mp ON pe.meeting_point_id = mp.id
+       LEFT JOIN event_types et ON e.event_type_id = et.id
+       LEFT JOIN meeting_points mp ON pe.meeting_point_id = mp.id
        LEFT JOIN staff assigned_staff ON assigned_staff.id = pe.staff_id
-       INNER JOIN programs p ON p.id = pe.program_id
-       INNER JOIN faculty_programs fp
-         ON fp.program_id = pe.program_id AND fp.faculty_id = ?`,
+       INNER JOIN programs p ON p.id = pe.program_id AND p.is_deleted = 0
+       WHERE EXISTS (SELECT 1 FROM faculty_programs fp
+         WHERE fp.program_id = pe.program_id AND fp.faculty_id = ?)
+       ORDER BY pe.start_datetime, pe.id`,
       [req.user.id],
     );
 

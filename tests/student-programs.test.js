@@ -126,3 +126,18 @@ test("program details expose language school configuration only for the selected
     assert.deepEqual(result.data, { program_id: 3, ...school });
   }
 });
+
+
+test("calendar includes all enrolled programs using authenticated membership", async () => {
+  const rows = [{ id: 1, program_id: 2 }, { id: 2, program_id: 3 }];
+  const result = await request("/calendar-events?program_id=999&student_id=999", [{
+    match: /WHERE EXISTS[\s\S]*psr.program_id = p.id AND psr.student_id = \? AND psr.is_deleted = 0/,
+    params: [7], rows,
+  }]);
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.data, rows);
+  assert.equal((await request("/calendar-events", [], null)).status, 401);
+  assert.equal((await request("/calendar-events", [], "faculty")).status, 403);
+  assert.equal((await request("/calendar-events", [], "staff")).status, 403);
+  assert.equal((await request("/calendar-events", [{ rows: [] }])).status, 404);
+});
