@@ -319,6 +319,7 @@ router.get(["/events", "/calendar-events"], (req, res, next) => {
       e.id as event_id,
       e.event_name,
       e.event_description,
+      e.dress_code,
       e.banner_url,
       mp.id as meeting_point_id,
       mp.meeting_point,

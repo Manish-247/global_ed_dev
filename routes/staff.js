@@ -402,6 +402,7 @@ router.get("/events", auth, async (req, res) => {
       e.id as event_id,
       e.event_name,
       e.event_description,
+      e.dress_code,
       e.banner_url,
       mp.meeting_point,
       mp.meeting_point_image_url,

@@ -135,6 +135,7 @@ router.get("/events", auth, async (req, res) => {
         e.id AS event_id,
         e.event_name,
         e.event_description,
+        e.dress_code,
         e.banner_url,
         mp.id AS meeting_point_id,
         mp.meeting_point,
